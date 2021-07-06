@@ -118,7 +118,10 @@ def erode_dilate(img, cfg):
 
 def find_max(opening, cfg):
     # 查找轮廓             opencv-contrib-python-3.4.1.15
-    _, contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # 1, 2
+    try :
+        _,contours,hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # 1, 2
+    except :
+        contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # 找到最大的轮廓
     area = []
     for k in range(len(contours)):

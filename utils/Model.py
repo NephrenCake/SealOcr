@@ -1,9 +1,10 @@
-import Network
+from . import network
 import cv2
 import time
 import torch
 from torchvision.transforms import ToTensor, Lambda, Compose
 from torchvision import transforms
+
 
 
 
@@ -14,18 +15,19 @@ SPPDict3 = r'ModelDict/c3,c32,c64,c128-192,s2,960,ac100SPP.pkl'
 class Model():
     def __init__(self,choice = 2):
         if choice == 0:
-            model = Network.SPP_Net1()
+            model = network.SPP_Net1()
             Dict = SPPDict1
         elif choice == 1:
-            model = Network.SPP_Net2()
+            model = network.SPP_Net2()
             Dict = SPPDict2
         else:
-            model = Network.SPP_Net3()
+            model = network.SPP_Net3()
             Dict = SPPDict3
         if self.Device()=="cuda":
             model.load_state_dict(torch.load(Dict))
         else :
             model.load_state_dict(torch.load(Dict, map_location=torch.device('cpu')))
+        print("Model loaded!")
         self.model = model
     def Device(self):
         device = "cuda" if torch.cuda.is_available() else "cpu"

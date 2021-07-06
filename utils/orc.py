@@ -18,6 +18,7 @@ def circle_orc(img_, cfg):
     # 上下翻转，分别检测文字和数字
     img_ = circle_to_rectangle(img_, 1)
     res = orc_request(img_, cfg=cfg)
+    return res
 
 
 def ellipse_orc(img_, cfg):

@@ -1,6 +1,8 @@
+# -- coding: utf-8 --
 import torch
 import torch.nn as nn
 import math
+
 class SPP_Layer(nn.Module):
     def __init__(self, num_levels= 2, pool_type='max_pool'):
         super(SPP_Layer, self).__init__()
