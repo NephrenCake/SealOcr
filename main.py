@@ -6,44 +6,46 @@ import cv2
 import numpy as np
 import re
 
-from utils.orc import circle_to_rectangle, orc_request, ellipse_orc, circle_orc, rectangle_orc
+from utils.ocr import circle_to_rectangle, ocr_request, ellipse_ocr, circle_ocr, rectangle_ocr
 from utils.detect import erode_dilate, find_max, fit_shape, filter_non_red, k_means, rotate_cut, enlarge_img
 from utils.Model import Model
 from utils.CubeOCR import CubeProcess
 import logging
+
 model = Model(2)
 
+
 def work(cfg):
-    category,img = model.predict(cfg['img_path'])
+    category, img = model.predict(cfg['img_path'])
     # 将原画布扩大，防止小尺寸图像在开运算时使边界溢出，那样会在 rotate_cut() 部分出错
     if category == '正方形':
-        word,num, = CubeProcess(img)
-        return img,category,{'文字：':word,'数字：':num}
+        word, num, = CubeProcess(img)
+        return img, category, {'文字：': word, '数字：': num}
     else:
         img = enlarge_img(img)
         img_ = img.copy()
-    # ===========目标检测与分类
+        # ===========目标检测与分类
         t0 = time.time()
-    # 提取红色部分
+        # 提取红色部分
         img_ = filter_non_red(img_, cfg=cfg)
-    # k-meas聚类
+        # k-meas聚类
         img_ = k_means(img_, cfg=cfg)
-    # 开运算去噪填充
+        # 开运算去噪填充
         img_ = erode_dilate(img_, cfg=cfg)
-    # 查找最大轮廓
+        # 查找最大轮廓
         contours, max_idx = find_max(img_, cfg=cfg)
-    # 检测并分类目标
+        # 检测并分类目标
         det = fit_shape(img, contours, max_idx, cfg=cfg)
-    # 截取目标区域
+        # 截取目标区域
         img_ = rotate_cut(img, det, cfg=cfg)
         t1 = time.time()
         res = []
-    # print(f"{cfg['img_path']} done in {t1 - t0}s. class={det['class']}")
-    # ============分类处理目标区域
+        # print(f"{cfg['img_path']} done in {t1 - t0}s. class={det['class']}")
+        # ============分类处理目标区域
         if category == '圆形':
-            res = circle_orc(img_, cfg=cfg)
-        else :
-            res = ellipse_orc(img_, cfg=cfg)
+            res = circle_ocr(img_, cfg=cfg)
+        else:
+            res = ellipse_ocr(img_, cfg=cfg)
         t2 = time.time()
         print(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
         logging.info(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
@@ -51,12 +53,12 @@ def work(cfg):
         words = ''
         print(res)
         for i in res:
-            if bool(re.search(r'\d',i['text'])):
-                num+=i['text']
+            if bool(re.search(r'\d', i['text'])):
+                num += i['text']
             else:
                 words = i['text'] + words
-        res = {'文字:':words,'数字:':num}
-        return  img_,category,res
+        res = {'文字:': words, '数字:': num}
+        return img_, category, res
 
 
 def one_pic(file_, to_path_, opt_):
@@ -72,7 +74,7 @@ def one_pic(file_, to_path_, opt_):
         "debug": opt_["debug"]
     }
 
-    result , cls, res = work(cfg)
+    result, cls, res = work(cfg)
     if not opt_["debug"]:
         # print(os.path.join(cfg["to_path"], cls + "_" + fn.split("\\")[-1]))
         # input("wait")
@@ -82,6 +84,7 @@ def one_pic(file_, to_path_, opt_):
             json.dump(res, f, ensure_ascii=False)
         cv2.imwrite(os.path.join(cfg["to_path"], cls + "_" + fn.split("/")[-1]), result)
     return res
+
 
 def main(imgpath):
     # 参数设置
@@ -126,19 +129,10 @@ def main(imgpath):
 
     for file in file_list:
         res = one_pic(file_=file, to_path_=to_path, opt_=opt)
-        #try:
+        # try:
         #    res = one_pic(file_=file, to_path_=to_path, opt_=opt)
-        #except Exception:
+        # except Exception:
         #    logging.error(f"error occurred in {file}")
-
 
     logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
     return res
-
-
-
-
-
-
-
-

@@ -10,28 +10,28 @@ import cv2
 import requests
 
 
-def circle_orc(img_, cfg):
+def circle_ocr(img_, cfg):
     # 转正圆形内容(五角星？
     # 检测无偏转文字，确定印章种类
     cls = ["财务专用章", "发票专用章", "合同专用章", ]
     # cv2.imshow("img_", img_)
     # 上下翻转，分别检测文字和数字
     img_ = circle_to_rectangle(img_, 1)
-    res = orc_request(img_, cfg=cfg)
+    res = ocr_request(img_, cfg=cfg)
     return res
 
 
-def ellipse_orc(img_, cfg):
+def ellipse_ocr(img_, cfg):
     res = []
     # 检测中间字符
     img1 = img_.copy() if img_.shape[0] < img_.shape[1] else np.rot90(img_.copy())
-    res = res + orc_request(img1, cfg=cfg)
+    res = res + ocr_request(img1, cfg=cfg)
     # 展平
     img2 = circle_to_rectangle(img1, 0)
-    res = res + orc_request(img2, cfg=cfg)
+    res = res + ocr_request(img2, cfg=cfg)
     # 展平
     img3 = circle_to_rectangle(img1, 1)
-    res = res + orc_request(img3, cfg=cfg)
+    res = res + ocr_request(img3, cfg=cfg)
     # 去重
     res = rm_words(res, cfg=cfg)
 
@@ -44,7 +44,7 @@ def ellipse_orc(img_, cfg):
     return res
 
 
-def rectangle_orc(img_, cfg):
+def rectangle_ocr(img_, cfg):
     pass
 
 
@@ -131,7 +131,7 @@ def circle_to_rectangle(cir_img, flip):
     return rect_img
 
 
-def orc_request(img, cfg):
+def ocr_request(img, cfg):
     def cv2_to_base64(image):
         data = cv2.imencode('.jpg', image)[1]
         return base64.b64encode(data.tostring()).decode('utf8')
@@ -154,5 +154,5 @@ def orc_request(img, cfg):
     return result
 
 
-def plot_orc(img):
+def plot_ocr(img):
     pass

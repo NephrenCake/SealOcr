@@ -5,7 +5,7 @@ import json
 import cv2
 import numpy as np
 
-from utils.orc import circle_to_rectangle, orc_request, ellipse_orc, circle_orc, rectangle_orc
+from utils.ocr import circle_to_rectangle, ocr_request, ellipse_ocr, circle_ocr, rectangle_ocr
 from utils.detect import erode_dilate, find_max, fit_shape, filter_non_red, k_means, rotate_cut, enlarge_img
 import logging
 
@@ -36,11 +36,11 @@ def main(cfg):
     # ============分类处理目标区域
     res = []
     if det["class"] == "circle":
-        res = circle_orc(img_, cfg=cfg)
+        res = circle_ocr(img_, cfg=cfg)
     elif det["class"] == "ellipse":
-        res = ellipse_orc(img_, cfg=cfg)
+        res = ellipse_ocr(img_, cfg=cfg)
     elif det["class"] == "rectangle":
-        res = rectangle_orc(img_, cfg=cfg)
+        res = rectangle_ocr(img_, cfg=cfg)
 
     t2 = time.time()
     print(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
