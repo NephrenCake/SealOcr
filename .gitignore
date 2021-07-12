@@ -212,6 +212,21 @@ fabric.properties
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
 
-debug
 .idea
+
+# 刘亦飞
+debug/
+run/
+seal_source/
+test_source/
 test.py
+test1.py
+test2.py
+test3.py
+
+#
+testdata/
+upload/
+
+#
+
