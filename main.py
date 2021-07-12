@@ -7,7 +7,7 @@ import numpy as np
 import re
 
 from utils.ocr import circle_to_rectangle, ocr_request, ellipse_ocr, circle_ocr, rectangle_ocr
-from utils.detect import erode_dilate, find_max, fit_shape, filter_non_red, k_means, rotate_cut, enlarge_img
+from utils.detect import erode_dilate, find_max, fit_shape, filter_non_red, k_means, rotate_cut, enlarge_img, get_area
 from utils.Model import Model
 from utils.CubeOCR import CubeProcess
 import logging
@@ -17,11 +17,11 @@ model = Model(2)
 
 def work(cfg):
     category, img = model.predict(cfg['img_path'])
-    # 将原画布扩大，防止小尺寸图像在开运算时使边界溢出，那样会在 rotate_cut() 部分出错
     if category == '正方形':
         word, num, = CubeProcess(img)
         return img, category, {'文字：': word, '数字：': num}
     else:
+        # 将原画布扩大，防止小尺寸图像在开运算时使边界溢出，那样会在 rotate_cut() 部分出错
         img = enlarge_img(img)
         img_ = img.copy()
         # ===========目标检测与分类
@@ -35,11 +35,12 @@ def work(cfg):
         # 查找最大轮廓
         contours, max_idx = find_max(img_, cfg=cfg)
         # 检测并分类目标
-        det = fit_shape(img, contours, max_idx, cfg=cfg)
+        # det = fit_shape(img, contours, max_idx, cfg=cfg)
+        det = get_area(img, contours, max_idx, category)  # 不进行分类
         # 截取目标区域
         img_ = rotate_cut(img, det, cfg=cfg)
         t1 = time.time()
-        res = []
+
         # print(f"{cfg['img_path']} done in {t1 - t0}s. class={det['class']}")
         # ============分类处理目标区域
         if category == '圆形':
@@ -49,6 +50,7 @@ def work(cfg):
         t2 = time.time()
         print(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
         logging.info(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
+
         num = ''
         words = ''
         print(res)
@@ -86,13 +88,7 @@ def one_pic(file_, to_path_, opt_):
     return res
 
 
-def main(imgpath):
-    # 参数设置
-    opt = {
-        "source": imgpath,
-        "debug": False,  # debug模式将可视化各环节，否则只输出结果
-    }
-
+def main(opt):
     # 可以识别文件or文件夹，统一为list
     file_list = []
     file_name = opt["source"].split("/")[-2] if opt["source"].endswith("/") else opt["source"].split("/")[-1]
@@ -117,22 +113,32 @@ def main(imgpath):
         if not os.path.exists(to_path):
             os.mkdir(to_path)
 
-    # 处理图片
-    # with ThreadPoolExecutor(10) as t:
-    #     for file in file_list:
-    #         print("submit!")
-    #         t.submit(one_pic, file_=file, to_path_=to_path, opt_=opt)
-
     LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
     logging.basicConfig(filename=f"{time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}.log", level=logging.INFO,
                         format=LOG_FORMAT)
 
+    text = None
     for file in file_list:
-        res = one_pic(file_=file, to_path_=to_path, opt_=opt)
+        text = one_pic(file_=file, to_path_=to_path, opt_=opt)
         # try:
         #    res = one_pic(file_=file, to_path_=to_path, opt_=opt)
         # except Exception:
         #    logging.error(f"error occurred in {file}")
 
+    # 线程池方法
+    # with ThreadPoolExecutor(50) as t:
+    #     for file in file_list:
+    #         print("submit!")
+    #         t.submit(one_pic, file_=file, to_path_=to_path, opt_=opt)
+
     logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
-    return res
+    return text
+
+
+if __name__ == '__main__':
+    # 参数设置
+    opt = {
+        "source": r'D:\ProjectFiles\Seal_Text_Detection\Seal_Text_Detection\seal_source/4101035073055.jpg',
+        "debug": True,  # debug模式将可视化各环节，否则只输出结果
+    }
+    main(opt)

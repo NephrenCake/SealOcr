@@ -20,7 +20,7 @@ def uploader():
         print(request.files)
         path = os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(f.filename))
         f.save(os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(f.filename)))
-        text = main(path)
+        text = main({"source": path, "debug": False})
         if (os.path.isfile(path)):
             os.remove(path)
         else:

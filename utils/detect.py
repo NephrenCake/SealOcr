@@ -118,9 +118,9 @@ def erode_dilate(img, cfg):
 
 def find_max(opening, cfg):
     # 查找轮廓             opencv-contrib-python-3.4.1.15
-    try :
-        _,contours,hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # 1, 2
-    except :
+    try:
+        _, contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # 1, 2
+    except:
         contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # 找到最大的轮廓
     area = []
@@ -189,7 +189,7 @@ def fit_shape(img, contours, max_idx, cfg):
         (b_x, b_y, b_w, b_h, b_t) = (c_x, c_y, 2 * c_r, 2 * c_r, 0)
         b_box = r_box
     distance = ((c_x - r_x) * (c_x - r_x) + (c_y - r_y) * (c_y - r_y) + (c_x - e_x) * (c_x - e_x) + (c_y - e_y) * (
-                c_y - e_y)) / 2
+            c_y - e_y)) / 2
     if e_err < 0.3 and r_err < 0.3 and distance > 100:  # 处理特例边缘明显噪声
         # 圆
         cls = "circle"
@@ -231,6 +231,39 @@ def fit_shape(img, contours, max_idx, cfg):
             json.dump(result, f)
         print(f"c_size:{c_size} r_size:{r_size} e_size:{e_size} e_err:{e_err} r_err:{r_err} distance:{distance}")
     return result
+
+
+def get_area(img, contours, max_idx, category):
+    cnt = contours[max_idx]
+
+    # 拟合圆
+    c = cv2.minEnclosingCircle(cnt)  # (中心(x,y), 半径)
+    c_x, c_y, c_r = int(c[0][0]), int(c[0][1]), int(c[1])
+    cls = "circle"
+    (b_x, b_y, b_w, b_h, b_t) = (c_x, c_y, 2 * c_r, 2 * c_r, 0)
+    # 拟合椭圆
+    if category == "椭圆":
+        if len(cnt) > 5:  # 需要5个点以上才能拟合椭圆
+            ellipse = cv2.fitEllipse(cnt)
+            e_x, e_y, e_a, e_b, e_t = int(ellipse[0][0]), int(ellipse[0][1]), int(ellipse[1][0] / 2), int(
+                ellipse[1][1] / 2), int(ellipse[2])
+            e_w, e_h = 2 * e_a, 2 * e_b
+        else:
+            e_x, e_y, e_a, e_b, e_t = c_x, c_y, c_r, c_r, 0
+            e_w, e_h = 2 * e_a, 2 * e_b
+        cls = "eclipse"
+        (b_x, b_y, b_w, b_h, b_t) = (e_x, e_y, e_w, e_h, e_t)
+
+    return {
+        "class": cls,
+        "box": {
+            "b_x": b_x,
+            "b_y": b_y,
+            "b_w": b_w,
+            "b_h": b_h,
+            "b_t": b_t
+        }
+    }
 
 
 def rotate_cut(img, det, cfg):

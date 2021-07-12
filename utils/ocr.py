@@ -70,8 +70,8 @@ def rm_words(res, cfg):
                     res[idx]["text"] = res[idx]["text"].replace(l, "")
 
     # 3. 过滤重复局部文本
-    # 按照文本长度升序排序
-    res.sort(key=lambda s: len(s["text"]), reverse=False)
+    # 按照 文本长度*置信度 升序排序
+    res.sort(key=lambda s: len(s["text"]) * s["confidence"], reverse=False)
     rm_ls = []
     for idx in range(len(res)):
         for j in range(idx + 1, len(res)):
@@ -146,7 +146,8 @@ def ocr_request(img, cfg):
     result = []
     for r in res:
         result.append({
-            "text": r["text"]
+            "confidence": r["confidence"],
+            "text": r["text"],
         })
         if cfg["debug"]:
             # print(r)
