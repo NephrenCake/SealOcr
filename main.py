@@ -12,7 +12,7 @@ from utils.Model import Model
 from utils.CubeOCR import CubeProcess
 import logging
 
-model = Model(2)
+model = Model(0)
 
 
 def work(cfg):
