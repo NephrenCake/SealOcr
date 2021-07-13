@@ -31,7 +31,7 @@ def work(cfg):
         # k-meas聚类
         img_ = k_means(img_, cfg=cfg)
         # 开运算去噪填充
-        img_ = erode_dilate(img_, cfg=cfg)
+        img_ = erode_dilate(img_, category, cfg=cfg)
         # 查找最大轮廓
         contours, max_idx = find_max(img_, cfg=cfg)
         # 检测并分类目标
@@ -71,6 +71,7 @@ def one_pic(file_, to_path_, opt_):
             os.mkdir(to_path_)
     assert os.path.exists(to_path_)
     cfg = {
+        "id": fn.split(".")[0],
         "img_path": file_,
         "to_path": to_path_,
         "debug": opt_["debug"]
@@ -81,10 +82,10 @@ def one_pic(file_, to_path_, opt_):
         # print(os.path.join(cfg["to_path"], cls + "_" + fn.split("\\")[-1]))
         # input("wait")
         # print(cfg["to_path"], cls + "_" + fn.split("/")[-1])
-        with open(os.path.join(cfg["to_path"], cls + "_" + fn.split("/")[-1]).replace(".jpg", ".json"), mode="w",
+        with open(os.path.join(cfg["to_path"], fn.split("/")[-1]).replace(".jpg", ".json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res, f, ensure_ascii=False)
-        cv2.imwrite(os.path.join(cfg["to_path"], cls + "_" + fn.split("/")[-1]), result)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cls + "_" + fn.split("/")[-1]), result)
     return res
 
 
@@ -135,10 +136,10 @@ def main(opt):
     return text
 
 
-if __name__ == '__main__':
-    # 参数设置
-    opt = {
-        "source": r'D:\ProjectFiles\Seal_Text_Detection\Seal_Text_Detection\seal_source/4101035073055.jpg',
-        "debug": True,  # debug模式将可视化各环节，否则只输出结果
-    }
-    main(opt)
+# if __name__ == '__main__':
+#     # 参数设置
+#     opt = {
+#         "source": r'seal_source/ellipse/4101055507392.jpg',
+#         "debug": True,  # debug模式将可视化各环节，否则只输出结果
+#     }
+#     main(opt)

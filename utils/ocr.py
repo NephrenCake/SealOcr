@@ -23,24 +23,25 @@ def circle_ocr(img_, cfg):
 
 def ellipse_ocr(img_, cfg):
     res = []
-    # 检测中间字符
+    # 转正，检测中间字符
     img1 = img_.copy() if img_.shape[0] < img_.shape[1] else np.rot90(img_.copy())
     res = res + ocr_request(img1, cfg=cfg)
-    # 展平
+    # 展平 + 拼接
     img2 = circle_to_rectangle(img1, 0)
+    img2 = np.concatenate((img2, img2), axis=1)
     res = res + ocr_request(img2, cfg=cfg)
-    # 展平
-    img3 = circle_to_rectangle(img1, 1)
-    res = res + ocr_request(img3, cfg=cfg)
     # 去重
     res = rm_words(res, cfg=cfg)
 
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_3.jpg"), img3)
-        with open(os.path.join(cfg["to_path"], "text.json"), mode="w", encoding="utf-8") as f:
-            json.dump(res, f, ensure_ascii=False)
+    if not cfg["debug"]:
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_2.jpg"), img2)
+        # with open(os.path.join(cfg["to_path"], cfg["id"] + ".json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res, f, ensure_ascii=False)
     return res
 
 
@@ -51,6 +52,9 @@ def rectangle_ocr(img_, cfg):
 def rm_words(res, cfg):
     letters_numbers = re.compile(r"[a-zA-Z0-9]", re.I)  # [a-z]|\d
     not_letters_numbers = re.compile(r"[^a-zA-Z0-9]", re.I)
+
+    if cfg["debug"]:
+        print(res)
 
     # 1. 过滤短文本
     for t in res:
@@ -82,7 +86,8 @@ def rm_words(res, cfg):
             rate = count / len(res[idx]["text"])
             if rate > 0.5:  # 如果短文本中超过一半都被包含在长文本中，则删去
                 rm_ls.append(idx)
-                print(f'{res[idx]["text"]} -> {res[j]["text"]} rate={rate} i={idx}')
+                if cfg["debug"]:
+                    print(f'{res[idx]["text"]} -> {res[j]["text"]} rate={rate} i={idx}')
                 break
     # 降序删去重复字段
     rm_ls.sort(reverse=True)

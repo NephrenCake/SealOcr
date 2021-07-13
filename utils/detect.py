@@ -100,16 +100,24 @@ def k_means(img, cfg):
     return thresh
 
 
-def erode_dilate(img, cfg):
+def erode_dilate(img, category, cfg):
     """
     仅接受二值
+    对于椭圆不需要膨胀太多，对于圆需要
     """
     # todo 调参啊
-    kernel = np.ones((5, 5), np.uint8)
-    img = cv2.dilate(img, kernel, iterations=1)  # 保留边缘
-    img = cv2.erode(img, kernel, iterations=2)  # 去噪
-    kernel = np.ones((7, 7), np.uint8)  # 774
-    img = cv2.dilate(img, kernel, iterations=4)  # 填充边缘
+    if category=="椭圆":
+        kernel = np.ones((5, 5), np.uint8)
+        img = cv2.dilate(img, kernel, iterations=1)  # 保留边缘
+        img = cv2.erode(img, kernel, iterations=1)  # 去噪
+        # kernel = np.ones((6, 6), np.uint8)  # 774
+        img = cv2.dilate(img, kernel, iterations=3)  # 填充边缘
+    else:
+        kernel = np.ones((5, 5), np.uint8)
+        img = cv2.dilate(img, kernel, iterations=1)  # 保留边缘
+        img = cv2.erode(img, kernel, iterations=1)  # 去噪
+        kernel = np.ones((7, 7), np.uint8)  # 774
+        img = cv2.dilate(img, kernel, iterations=5)  # 填充边缘
 
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "4_open.jpg"), img)
