@@ -6,12 +6,14 @@ import cv2
 import json
 
 
-def enlarge_img(img):
-    # 边界+50%，防止小尺寸图像中目标溢出边界，特别是旋转椭圆
-    h = img.shape[0] // 2
-    w = img.shape[1] // 2
-    img_ = cv2.copyMakeBorder(img, h, h, w, w, cv2.BORDER_CONSTANT, value=[255, 255, 255])
-    return img_
+def enlarge_img(img, top=0.5, bottom=0.5, left=0.5, right=0.5):
+    # 边界+50%，防止旋转时使目标溢出边界，特别是旋转椭圆
+    top = int(img.shape[0] * top)
+    bottom = int(img.shape[0] * bottom)
+    left = int(img.shape[1] * left)
+    right = int(img.shape[1] * right)
+    return cv2.copyMakeBorder(img, top, bottom, left, right,
+                              cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
 
 # extract_red() filter_non_red() 选一用就行了
@@ -54,11 +56,11 @@ def filter_non_red(img, cfg):
     for i in range(h):
         for j in range(w):
             h = img_hsv[i, j, 0]
-            not_red = not (0 <= h <= 30 or 150 <= h <= 180)  # 尽可能抓更多的红色，反正也没其他颜色
+            not_red = not (0 <= h <= 30 or 150 <= h <= 180)
             v = int(img_hsv[i, j, 2])
-            s = int(img_hsv[i, j, 1])
+            s = int(img_hsv[i, j, 1])  # 注意转int否则在表达式中可能超出范围而报错
             is_black = False
-            if v + s <= 255 or v < 127:  # 黑色要尽量杀干净，不然k-means要出问题
+            if v + s <= 255 or v < 127:  # 尽可能去除灰色和黑色，否则k-means会出问题
                 is_black = True
             if not_red or is_black:
                 # print(i, j)
@@ -80,15 +82,12 @@ def k_means(img, cfg):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     ret, label, center = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
     # Now convert back into uint8, and make original image
-    center = np.uint8(center)  # 返回两种分类群的中心数值
-    mean = int(np.mean(center))  # 计算不同图片的不同分界阈值，即最能区分两个分类群的灰度值
-    result = center[label.flatten()]
-    result = result.reshape(img.shape)  # 重构图像
+    center = np.uint8(center)  # 返回两种分类群的中心
+    mean = int(np.mean(center))  # 最能区分两个分类群的灰度值
+    result = center[label.flatten()].reshape(img.shape)  # 重构图像
 
-    # 灰度
-    gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-    # 二值
-    ret, thresh = cv2.threshold(gray, mean, 255, cv2.THRESH_BINARY)  # 63-255保留深红
+    ret, thresh = cv2.threshold(cv2.cvtColor(result, cv2.COLOR_BGR2GRAY),  # 灰度
+                                mean, 255, cv2.THRESH_BINARY)  # 二值
     # 翻转颜色为: 前景为白，背景为黑
     for i in range(thresh.shape[0]):
         for j in range(thresh.shape[1]):
@@ -105,31 +104,36 @@ def erode_dilate(img, category, cfg):
     仅接受二值
     对于椭圆不需要膨胀太多，对于圆需要
     """
+    img_ = img.copy()
     # todo 调参啊
-    if category=="椭圆":
-        kernel = np.ones((5, 5), np.uint8)
-        img = cv2.dilate(img, kernel, iterations=1)  # 保留边缘
-        img = cv2.erode(img, kernel, iterations=1)  # 去噪
-        # kernel = np.ones((6, 6), np.uint8)  # 774
-        img = cv2.dilate(img, kernel, iterations=3)  # 填充边缘
-    else:
-        kernel = np.ones((5, 5), np.uint8)
-        img = cv2.dilate(img, kernel, iterations=1)  # 保留边缘
-        img = cv2.erode(img, kernel, iterations=1)  # 去噪
-        kernel = np.ones((7, 7), np.uint8)  # 774
-        img = cv2.dilate(img, kernel, iterations=5)  # 填充边缘
+    kernel = np.ones((5, 5), np.uint8)
+    img_ = cv2.dilate(img_, kernel, iterations=1)  # 保留边缘
+    img_ = cv2.erode(img_, kernel, iterations=1)  # 去噪
+    img_ = cv2.dilate(img_, kernel, iterations=3)  # 填充边缘
+    # if category == "椭圆":
+    #     kernel = np.ones((5, 5), np.uint8)
+    #     img_ = cv2.dilate(img_, kernel, iterations=1)  # 保留边缘
+    #     img_ = cv2.erode(img_, kernel, iterations=1)  # 去噪
+    #     # kernel = np.ones((6, 6), np.uint8)  # 774
+    #     img_ = cv2.dilate(img_, kernel, iterations=3)  # 填充边缘
+    # else:
+    #     kernel = np.ones((5, 5), np.uint8)
+    #     img_ = cv2.dilate(img_, kernel, iterations=1)  # 保留边缘
+    #     img_ = cv2.erode(img_, kernel, iterations=1)  # 去噪
+    #     kernel = np.ones((7, 7), np.uint8)  # 774
+    #     img_ = cv2.dilate(img_, kernel, iterations=3)  # 填充边缘
 
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "4_open.jpg"), img)
-    return img
+        cv2.imwrite(os.path.join(cfg["to_path"], "4_open.jpg"), img_)
+    return img_
 
 
-def find_max(opening, cfg):
-    # 查找轮廓             opencv-contrib-python-3.4.1.15
+def find_max(opening):
+    # 查找轮廓
     try:
-        _, contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # 1, 2
+        _, contours, _ = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     except:
-        contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # 找到最大的轮廓
     area = []
     for k in range(len(contours)):
@@ -155,7 +159,10 @@ def fit_shape(img, contours, max_idx, cfg):
     # 拟合矩形
     r = cv2.minAreaRect(cnt)  # (中心(x,y), (宽,高), 旋转角度)
     r_x, r_y, r_w, r_h, r_t = int(r[0][0]), int(r[0][1]), int(r[1][0]), int(r[1][1]), int(r[2])
-    r_box = cv2.boxPoints(r)  # cv2.cv.BoxPoints -> cv2.boxPoints() 注意是小写b，不是大写
+    try:
+        r_box = cv2.boxPoints(r)  # cv2.cv.BoxPoints -> cv2.boxPoints() 注意是小写b，不是大写
+    except:
+        r_box = cv2.cv.BoxPoints(r)
     r_box = np.int0(r_box)  # [[]*4]
     # 拟合椭圆
     if len(cnt) > 5:
@@ -221,12 +228,9 @@ def fit_shape(img, contours, max_idx, cfg):
         mask = cv2.drawContours(mask, contours, max_idx, (138, 43, 226), -1)  # 填充最大轮廓
         img = cv2.addWeighted(img, 0.5, mask, 0.7, 0)
         # 绘制最小圆
-        # print("最小圆: ", c)
         cv2.circle(img, (c_x, c_y), 5, (0, 255, 0), -1)
         cv2.circle(img, (c_x, c_y), c_r, (0, 255, 0), 5)
         # 绘制最小矩形
-        # print("最小矩形: ", r)
-        # cv2.circle(img, (r_x, r_y), 5, (0, 0, 255), -1)
         img = cv2.drawContours(img, [r_box], 0, (0, 0, 255), 5)
         # 绘制最小椭圆
         cv2.ellipse(img, (e_x, e_y), (e_a, e_b), e_t, 0, 360, (255, 0, 0), 5)
@@ -241,27 +245,34 @@ def fit_shape(img, contours, max_idx, cfg):
     return result
 
 
-def get_area(img, contours, max_idx, category):
+def get_area(img, contours, max_idx, category, cfg):
     cnt = contours[max_idx]
-
-    # 拟合圆
-    c = cv2.minEnclosingCircle(cnt)  # (中心(x,y), 半径)
-    c_x, c_y, c_r = int(c[0][0]), int(c[0][1]), int(c[1])
-    cls = "circle"
-    (b_x, b_y, b_w, b_h, b_t) = (c_x, c_y, 2 * c_r, 2 * c_r, 0)
-    # 拟合椭圆
-    if category == "椭圆":
-        if len(cnt) > 5:  # 需要5个点以上才能拟合椭圆
+    if category == "正方形":
+        # 拟合矩形
+        r = cv2.minAreaRect(cnt)  # (中心(x,y), (宽,高), 旋转角度)
+        r_x, r_y, r_w, r_h, r_t = int(r[0][0]), int(r[0][1]), int(r[1][0]), int(r[1][1]), int(r[2])
+        cls, b_x, b_y, b_w, b_h, b_t = "rectangle", r_x, r_y, r_w, r_h, r_t
+    elif category == "圆形":
+        # 拟合圆
+        c = cv2.minEnclosingCircle(cnt)  # (中心(x,y), 半径)
+        c_x, c_y, c_r = int(c[0][0]), int(c[0][1]), int(c[1])
+        cls, b_x, b_y, b_w, b_h, b_t = "circle", c_x, c_y, 2 * c_r, 2 * c_r, 0
+    else:
+        # 拟合椭圆
+        if len(cnt) > 5:  # 需要5个点以上才能拟合椭圆，否则只能用圆形
             ellipse = cv2.fitEllipse(cnt)
             e_x, e_y, e_a, e_b, e_t = int(ellipse[0][0]), int(ellipse[0][1]), int(ellipse[1][0] / 2), int(
                 ellipse[1][1] / 2), int(ellipse[2])
             e_w, e_h = 2 * e_a, 2 * e_b
         else:
-            e_x, e_y, e_a, e_b, e_t = c_x, c_y, c_r, c_r, 0
+            c = cv2.minEnclosingCircle(cnt)  # (中心(x,y), 半径)
+            e_x, e_y, e_a, e_b, e_t = int(c[0][0]), int(c[0][1]), int(c[1]), int(c[1]), 0
             e_w, e_h = 2 * e_a, 2 * e_b
-        cls = "eclipse"
-        (b_x, b_y, b_w, b_h, b_t) = (e_x, e_y, e_w, e_h, e_t)
+        cls, b_x, b_y, b_w, b_h, b_t = "eclipse", e_x, e_y, e_w, e_h, e_t
 
+    if cfg["debug"]:
+        # do sth help debug
+        pass
     return {
         "class": cls,
         "box": {
@@ -275,21 +286,15 @@ def get_area(img, contours, max_idx, category):
 
 
 def rotate_cut(img, det, cfg):
-    height = img.shape[0]
-    width = img.shape[1]
-
-    # getRotationMatrix2D 函数可获取旋转的仿射矩阵
-    # 参数依次为（旋转中心，旋转角度，缩放比例）
+    # 旋转中心，旋转角度，缩放比例
     mat_rotate = cv2.getRotationMatrix2D((det["box"]["b_x"], det["box"]["b_y"]), det["box"]["b_t"], 1)
-    img_ = cv2.warpAffine(img, mat_rotate, (width, height))
+    img_ = cv2.warpAffine(img, mat_rotate, (img.shape[1], img.shape[0]))
+    # 通过中心坐标、长、宽，获取目标的box
     x, y, w, h = det["box"]["b_x"], det["box"]["b_y"], det["box"]["b_w"], det["box"]["b_h"]
     p1_x, p1_y = x - w // 2, y - h // 2
     p2_x, p2_y = x + w // 2, y + h // 2
-    # cv2.line(img_, (p1_x, p1_y), (p2_x, p2_y), (0, 255, 0), 5)
-    # cv2.imshow("im", img_)
-    # cv2.waitKey(0)
     img_ = img_[p1_y:p2_y, p1_x:p2_x]
-    img_ = np.rot90(img_)
+    # img_ = np.rot90(img_)  # 可选的90°旋转
 
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "6_cut.jpg"), img_)

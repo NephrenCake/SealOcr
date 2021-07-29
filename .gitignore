@@ -213,6 +213,7 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 .idea
+upload/
 
 # 刘亦飞
 debug/

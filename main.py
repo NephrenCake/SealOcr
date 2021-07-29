@@ -3,11 +3,8 @@ import os
 import time
 import json
 import cv2
-import numpy as np
-import re
-
-from utils.ocr import circle_to_rectangle, ocr_request, ellipse_ocr, circle_ocr, rectangle_ocr
-from utils.detect import erode_dilate, find_max, fit_shape, filter_non_red, k_means, rotate_cut, enlarge_img, get_area
+from utils.ocr import ellipse_ocr, circle_ocr, rectangle_ocr
+from utils.detect import erode_dilate, find_max, filter_non_red, k_means, rotate_cut, enlarge_img, get_area
 from utils.Model import Model
 from utils.CubeOCR import CubeProcess
 import logging
@@ -17,50 +14,49 @@ model = Model(0)
 
 def work(cfg):
     category, img = model.predict(cfg['img_path'])
-    if category == '正方形':
-        word, num, = CubeProcess(img)
-        return img, category, {'文字：': word, '数字：': num}
+    img = enlarge_img(img)
+    img_ = img.copy()
+    # ===========目标检测与分类
+    t0 = time.time()
+    # 提取红色部分
+    img_ = filter_non_red(img_, cfg=cfg)
+    t1 = time.time()
+    # k-meas聚类
+    img_ = k_means(img_, cfg=cfg)
+    img_bw = cv2.merge([img_, img_, img_])
+    t2 = time.time()  # kmeans = t2 - t1
+    # 开运算去噪填充
+    img_ = erode_dilate(img_, category, cfg=cfg)
+    t3 = time.time()
+    # 查找最大轮廓
+    contours, max_idx = find_max(img_)
+    t4 = time.time()
+    # 检测并分类目标
+    # det = fit_shape(img, contours, max_idx, cfg=cfg)
+    det = get_area(img, contours, max_idx, category, cfg=cfg)  # 不进行分类
+    t5 = time.time()
+    # 截取目标区域  img:原图 img_bw:二值
+    img = rotate_cut(img, det, cfg=cfg)
+    img_bw = rotate_cut(img_bw, det, cfg=cfg)
+    t6 = time.time()
+
+    # ============分类处理目标区域
+    if category == '圆形':
+        res = circle_ocr(img, img_bw, cfg=cfg)  # 使用二值图预测
+    elif category == "正方形":
+        res = rectangle_ocr(img, img_bw, cfg=cfg)
     else:
-        # 将原画布扩大，防止小尺寸图像在开运算时使边界溢出，那样会在 rotate_cut() 部分出错
-        img = enlarge_img(img)
-        img_ = img.copy()
-        # ===========目标检测与分类
-        t0 = time.time()
-        # 提取红色部分
-        img_ = filter_non_red(img_, cfg=cfg)
-        # k-meas聚类
-        img_ = k_means(img_, cfg=cfg)
-        # 开运算去噪填充
-        img_ = erode_dilate(img_, category, cfg=cfg)
-        # 查找最大轮廓
-        contours, max_idx = find_max(img_, cfg=cfg)
-        # 检测并分类目标
-        # det = fit_shape(img, contours, max_idx, cfg=cfg)
-        det = get_area(img, contours, max_idx, category)  # 不进行分类
-        # 截取目标区域
-        img_ = rotate_cut(img, det, cfg=cfg)
-        t1 = time.time()
-
-        # print(f"{cfg['img_path']} done in {t1 - t0}s. class={det['class']}")
-        # ============分类处理目标区域
-        if category == '圆形':
-            res = circle_ocr(img_, cfg=cfg)
-        else:
-            res = ellipse_ocr(img_, cfg=cfg)
-        t2 = time.time()
-        print(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
-        logging.info(f"{cfg['img_path']} done in {round(t1 - t0, 2)}+{round(t2 - t1, 2)}s. class={det['class']}")
-
-        num = ''
-        words = ''
-        print(res)
-        for i in res:
-            if bool(re.search(r'\d', i['text'])):
-                num += i['text']
-            else:
-                words = i['text'] + words
-        res = {'文字:': words, '数字:': num}
-        return img_, category, res
+        res = ellipse_ocr(img, img_bw, cfg=cfg)
+    t7 = time.time()
+    detail = f"{cfg['id']} done " \
+             f"kmeans:{round(t2 - t1, 2)}+" \
+             f"fit:{round(t5 - t4, 2)}+" \
+             f"ocr:{round(t7 - t6, 2)}=" \
+             f"total{round(t7 - t0, 2)}s. " \
+             f"class={det['class']}"
+    print(detail)
+    logging.info(detail)
+    return category, res
 
 
 def one_pic(file_, to_path_, opt_):
@@ -77,15 +73,11 @@ def one_pic(file_, to_path_, opt_):
         "debug": opt_["debug"]
     }
 
-    result, cls, res = work(cfg)
+    cls, res = work(cfg)
     if not opt_["debug"]:
-        # print(os.path.join(cfg["to_path"], cls + "_" + fn.split("\\")[-1]))
-        # input("wait")
-        # print(cfg["to_path"], cls + "_" + fn.split("/")[-1])
         with open(os.path.join(cfg["to_path"], fn.split("/")[-1]).replace(".jpg", ".json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res, f, ensure_ascii=False)
-        # cv2.imwrite(os.path.join(cfg["to_path"], cls + "_" + fn.split("/")[-1]), result)
     return res
 
 
@@ -115,31 +107,26 @@ def main(opt):
             os.mkdir(to_path)
 
     LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-    logging.basicConfig(filename=f"{time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}.log", level=logging.INFO,
+    logging.basicConfig(filename=f"{time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}.log",
+                        level=logging.INFO,
                         format=LOG_FORMAT)
 
     text = None
     for file in file_list:
-        text = one_pic(file_=file, to_path_=to_path, opt_=opt)
-        # try:
-        #    res = one_pic(file_=file, to_path_=to_path, opt_=opt)
-        # except Exception:
-        #    logging.error(f"error occurred in {file}")
-
-    # 线程池方法
-    # with ThreadPoolExecutor(50) as t:
-    #     for file in file_list:
-    #         print("submit!")
-    #         t.submit(one_pic, file_=file, to_path_=to_path, opt_=opt)
+        # text = one_pic(file_=file, to_path_=to_path, opt_=opt)
+        try:
+           text = one_pic(file_=file, to_path_=to_path, opt_=opt)
+        except Exception:
+           logging.error(f"error occurred in {file}")
 
     logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
-    return text
+    return json.dumps(text, ensure_ascii=False)
 
 
-# if __name__ == '__main__':
-#     # 参数设置
-#     opt = {
-#         "source": r'seal_source/ellipse/4101055507392.jpg',
-#         "debug": True,  # debug模式将可视化各环节，否则只输出结果
-#     }
-#     main(opt)
+if __name__ == '__main__':
+    # 参数设置
+    opt = {
+        "source": r'seal_source/circle/4101035073167.jpg',
+        "debug": True,  # debug模式将可视化各环节，否则只输出结果
+    }
+    main(opt)
