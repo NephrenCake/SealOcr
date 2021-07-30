@@ -9,7 +9,6 @@ import math
 import cv2
 import requests
 
-
 # img2 = np.rot90(np.rot90(img2))
 # cv2.imshow("img3", img1)
 # cv2.waitKey(0)
@@ -20,7 +19,7 @@ not_en_nor_num = re.compile(r"[^a-zA-Z0-9]", re.I)  # 非英文数字
 
 
 def circle_ocr(img_, img_bw, cfg):
-    # 1. 识别旋转汉字=================================================
+    # 1. 识别旋转汉字、定位=================================================
     img2 = circle_to_rectangle(img_)  # 拉直
     img2 = np.concatenate((img2, img2), axis=1)  # 横向拼接截断文本
     img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
@@ -39,7 +38,7 @@ def circle_ocr(img_, img_bw, cfg):
     res1 = rm_words(ocr_request(img1, cfg=cfg),
                     cfg=cfg)
 
-    if len(res1) != 0:
+    if len(res1) != 0:  # 消去五大章字样
         for item in res1:
             if item["text"].endswith("章"):
                 img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
@@ -50,11 +49,17 @@ def circle_ocr(img_, img_bw, cfg):
     img3 = np.rot90(np.rot90(img3))  # 转正数字
     res3 = rm_words(ocr_request(img3, cfg=cfg),
                     cfg=cfg)
+    # 4. 再次校准旋转汉字=================================================
+    img4 = circle_to_rectangle(img1)  # 拉直
+    img4 = img4[:img4.shape[0] // 3 * 2, :]  # 只检测边缘2/3
+    res4 = rm_words(ocr_request(img4, cfg=cfg),
+                    cfg=cfg)
 
     if not cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_2.jpg"), img2)
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_3.jpg"), img3)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_4.jpg"), img4)
         with open(os.path.join(cfg["to_path"], cfg["id"] + "_1.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res1, f, ensure_ascii=False)
@@ -64,12 +69,16 @@ def circle_ocr(img_, img_bw, cfg):
         with open(os.path.join(cfg["to_path"], cfg["id"] + "_3.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res3, f, ensure_ascii=False)
+        with open(os.path.join(cfg["to_path"], cfg["id"] + "_3.json"), mode="w",
+                  encoding="utf-8") as f:
+            json.dump(res4, f, ensure_ascii=False)
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_0.jpg"), img_)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_3.jpg"), img3)
-    return rm_words(res1 + res2 + res3, cfg=cfg)
+        cv2.imwrite(os.path.join(cfg["to_path"], "trans_4.jpg"), img4)
+    return rm_words(res1 + res2 + res3 + res4, cfg=cfg)
 
 
 def cal_angle(res, img2, cfg):
@@ -80,30 +89,31 @@ def cal_angle(res, img2, cfg):
     long_side = img2.shape[1]
     pos = (res[-1]["text_region"][0][0] + res[-1]["text_region"][1][0]) // 2  # 已经按照文本长度升序排列
     rate = (pos - long_side / 2) / (long_side / 2)
-    angle = 360 * rate if len(not_en_nor_num.findall(res[-1]["text"])) > len(en_or_num.findall(res[-1]["text"])) else \
+    angle = 360 * rate if len(not_en_nor_num.findall(res[-1]["text"])) < len(en_or_num.findall(res[-1]["text"])) else \
         360 * rate + 180  # 如果最长的是汉字文本则+180
 
     if cfg["debug"]:
-        print(f"pos:{pos} rate:{rate} angle:{angle} long_side:{long_side}")
+        print(f"pos:{pos} rate:{rate} angle:{angle} long_side:{long_side}\n")
     return angle
 
 
 def ellipse_ocr(img_, img_bw, cfg):
     # 1. 转正，检测中间字符
-    if img_.shape[0] < img_.shape[1]:
-        img0, img_bw0 = img_.copy(), img_bw.copy()
-    else:
-        img0, img_bw0 = np.rot90(img_.copy()), np.rot90(img_bw.copy())
+    img1 = img_.copy() if img_.shape[0] < img_.shape[1] else np.rot90(img_.copy())
 
-    img1 = np.concatenate((img0, img_bw0), axis=0)  # 同时预测彩色和黑白
     res1 = rm_words(ocr_request(img1, cfg=cfg),
                     cfg=cfg)
+
+    if len(res1) != 0:
+        for item in res1:
+            if item["text"].endswith("章"):
+                img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
+                break
     # 2. 展平 + 拼接
-    img2 = circle_to_rectangle(img0)
+    img2 = circle_to_rectangle(img1)
     img2 = np.concatenate((img2, img2), axis=1)  # 横向拼接截断文本
-    img_bw2 = circle_to_rectangle(img_bw0)
-    img_bw2 = np.concatenate((img_bw2, img_bw2), axis=1)  # 横向拼接截断文本
-    img2 = np.concatenate((img2, img_bw2), axis=0)  # 同时预测彩色和黑白
+    img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
+
     res2 = rm_words(ocr_request(img2, cfg=cfg),
                     cfg=cfg)
 
@@ -151,6 +161,20 @@ def rm_words(res, cfg):
         if len(item["text"]) >= 5:
             save_list.append(item)
     res = save_list
+
+    # 2. 去除中文文本中的数字和英文，以及去除英文数字文本中的中文
+    # 这是有必要的，因为有可能会出现"郑91410182MA9FNWR87J回", 甚至"郑""回"是横着的
+    for idx in range(len(res)):
+        txt = res[idx]["text"]
+        l_n = en_or_num.findall(txt)
+        n_l_n = not_en_nor_num.findall(txt)
+        if len(l_n) != 0 and len(n_l_n) != 0:
+            if len(l_n) > len(n_l_n):
+                for l in n_l_n:
+                    res[idx]["text"] = res[idx]["text"].replace(l, "")
+            else:
+                for l in l_n:
+                    res[idx]["text"] = res[idx]["text"].replace(l, "")
 
     # 2. 过滤重复局部文本
     rm_idx_list = []
@@ -221,6 +245,7 @@ def ocr_request(img, cfg):
                 "text_region": [[x, y] * 4]
             } * n ]
     """
+
     def cv2_to_base64(image):
         data = cv2.imencode('.jpg', image)[1]
         return base64.b64encode(data.tostring()).decode('utf8')

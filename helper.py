@@ -3,7 +3,7 @@ import json
 
 
 def cal_pre_rec():
-    cls = "rectangle"
+    cls = "circle"
     pre: dict = read_json(f"validation/rotate_cut/{cls}/text_result.json")
     lab: dict = read_json(f"validation/rotate_cut/{cls}/text_label.json")
 
@@ -13,24 +13,32 @@ def cal_pre_rec():
     right_in_predict = 0
     right_pic = 0
 
-    text_not_found = []
+    errors = []
     for key in lab.keys():
         total_lab += len(lab[key])
         total_pre += len(pre[key])
-        flag = 1
+
+        correct_texts = []  # 应该但没有被检测到的文本
+        wrong_texts = []  # 不应该被却被检测到的文本
         for text in pre[key]:
             if text in lab[key]:
                 right_in_label += 1
             else:
-                flag = 0
+                wrong_texts.append(text)
         for text in lab[key]:
             if text in pre[key]:
                 right_in_predict += 1
             else:
-                text_not_found.append({key: text})
-                flag = 0
-        if flag == 1:
+                correct_texts.append(text)
+        if len(correct_texts) == 0 and len(wrong_texts) == 0:
             right_pic += 1
+        else:
+            errors.append({
+                key: {
+                    "correct_texts": correct_texts,
+                    "wrong_texts": wrong_texts
+                }
+            })
 
     recall = right_in_predict / total_lab
     precision = right_in_label / total_pre
@@ -40,7 +48,7 @@ def cal_pre_rec():
     print("图片级标注:=============")
     print(f"precision: {right_pic / 50}")
     print("未检对文本:=============")
-    for item in text_not_found:
+    for item in errors:
         print(item)
 
 
