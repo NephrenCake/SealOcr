@@ -25,10 +25,10 @@ def Lazyfilter(img,cfg):
 
 def work(cfg):
     category, img = model.predict(cfg['img_path'])
-    img = enlarge_img(img   )
+    img = enlarge_img(img)
     img_ = img.copy()
     t0 = time.time()
-    img_,img_bw = Precisefilter(img_,cfg)
+    img_,img_bw = Lazyfilter(img_,cfg)
     t2 = time.time()  # kmeans = t2 - t1
     # 开运算去噪填充
     img_ = erode_dilate(img_, category, cfg=cfg)
@@ -60,9 +60,7 @@ def work(cfg):
              f"class={det['class']}"
     print(detail)
     logging.info(detail)
-    print(res)
     return category, res
-
 
 def one_pic(file_, to_path_, opt_):
     fn = file_.split("/")[-1]
@@ -125,7 +123,6 @@ def main(opt):
         except Exception:
            logging.error(f"error occurred in {file}")
         '''
-
     logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
     return json.dumps(text, ensure_ascii=False)
 
@@ -133,7 +130,7 @@ def main(opt):
 if __name__ == '__main__':
     # 参数设置
     opt = {
-        "source": r'C:\Users\a8275\Desktop\project\dataset\4101035072668.jpg',
-        "debug": True,  # debug模式将可视化各环节，否则只输出结果
+        "source": r'C:/Users/a8275/Desktop/project/rd/4101035073190.jpg' ,
+        "debug": False  # debug模式将可视化各环节，否则只输出结果
     }
-    main(opt)
+    print(main(opt))
