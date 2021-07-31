@@ -107,7 +107,11 @@ def ellipse_ocr(img_, img_bw, cfg):
     if len(res1) != 0:
         for item in res1:
             if item["text"].endswith("章"):
-                img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
+                try:
+                    img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
+                except:
+                    img1 = img1.copy()
+                    img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
                 break
     # 2. 展平 + 拼接
     img2 = circle_to_rectangle(img1)
