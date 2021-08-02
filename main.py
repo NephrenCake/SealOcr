@@ -4,27 +4,32 @@ import time
 import json
 import cv2
 from utils.ocr import ellipse_ocr, circle_ocr, rectangle_ocr
-from utils.detect import erode_dilate, find_max, filter_non_red, k_means, rotate_cut, enlarge_img, get_area
+from utils.detect import *
 from utils.Model import Model
 from utils.CubeOCR import CubeProcess
 import logging
-
 model = Model(0)
 
+def Precisefilter(img,cfg):
+    img_ = filter_non_red(img, cfg=cfg)
+    t1 = time.time()
+    # k-meas聚类
+    img_ = k_means(img_, cfg=cfg)
+    img_bw = cv2.merge([img_, img_, img_])
+    return img_,img_bw
+
+def Lazyfilter(img,cfg):
+    img_ = Differ_kmeans(img,cfg)
+    img_bw = cv2.merge([img_,img_,img_])
+    return img_,img_bw
 
 def work(cfg):
     category, img = model.predict(cfg['img_path'])
     img = enlarge_img(img)
     img_ = img.copy()
-    # ===========目标检测与分类
     t0 = time.time()
-    # 提取红色部分
-    img_ = filter_non_red(img_, cfg=cfg)
-    t1 = time.time()
-    # k-meas聚类
-    img_ = k_means(img_, cfg=cfg)
-    img_bw = cv2.merge([img_, img_, img_])
-    t2 = time.time()  # kmeans = t2 - t1
+    img_,img_bw = Lazyfilter(img_,cfg)
+    t2 = time.time()
     # 开运算去噪填充
     img_ = erode_dilate(img_, category, cfg=cfg)
     t3 = time.time()
@@ -39,7 +44,6 @@ def work(cfg):
     img = rotate_cut(img, det, cfg=cfg)
     img_bw = rotate_cut(img_bw, det, cfg=cfg)
     t6 = time.time()
-
     # ============分类处理目标区域
     if category == '圆形':
         res = circle_ocr(img, img_bw, cfg=cfg)  # 使用二值图预测
@@ -49,7 +53,7 @@ def work(cfg):
         res = ellipse_ocr(img, img_bw, cfg=cfg)
     t7 = time.time()
     detail = f"{cfg['id']} done " \
-             f"kmeans:{round(t2 - t1, 2)}+" \
+             f"kmeans+redfilter:{round(t2 - t0, 2)}+" \
              f"fit:{round(t5 - t4, 2)}+" \
              f"ocr:{round(t7 - t6, 2)}=" \
              f"total{round(t7 - t0, 2)}s. " \
@@ -57,7 +61,6 @@ def work(cfg):
     print(detail)
     logging.info(detail)
     return category, res
-
 
 def one_pic(file_, to_path_, opt_):
     fn = file_.split("/")[-1]
@@ -113,12 +116,13 @@ def main(opt):
 
     text = None
     for file in file_list:
-        # text = one_pic(file_=file, to_path_=to_path, opt_=opt)
+        text = one_pic(file_=file, to_path_=to_path, opt_=opt)
+        '''
         try:
            text = one_pic(file_=file, to_path_=to_path, opt_=opt)
         except Exception:
            logging.error(f"error occurred in {file}")
-
+        '''
     logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
     return json.dumps(text, ensure_ascii=False)
 
@@ -126,7 +130,7 @@ def main(opt):
 if __name__ == '__main__':
     # 参数设置
     opt = {
-        "source": r'seal_source/circle/4101035073167.jpg',
-        "debug": True,  # debug模式将可视化各环节，否则只输出结果
+        "source": r'C:/Users/a8275/Desktop/project/dataset/4101035073190.jpg' ,
+        "debug": False  # debug模式将可视化各环节，否则只输出结果
     }
-    main(opt)
+    print(main(opt))

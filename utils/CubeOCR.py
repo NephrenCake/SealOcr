@@ -178,6 +178,10 @@ def GetNumArea(results, deg):
             #print(Box0)
             Box1 = [[m, 0], [r, 0], [r, hl], [m, hl]]
             #print(Box1)
+    else:
+        Box0=[[0,0],[0,0],[0,0],[0,0]]
+        Box1=[[0,0],[0,0],[0,0],[0,0]]
+        wordtext =None
     return Box0, Box1, wordtext
 
 

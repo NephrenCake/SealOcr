@@ -5,6 +5,26 @@ import numpy as np
 import cv2
 import json
 
+def Differ_kmeans(img,cfg):
+    """
+    根据差值进行分类
+    """
+    img_shape = img.shape
+    img = np.float32(img.reshape((-1, 3)))
+    img1 = np.expand_dims(img[:,2]-img[:,1],1)
+    img2 = np.expand_dims(img[:,2]-img[:,0],1)
+    data = np.concatenate((img1,img2),axis = 1)
+    k = 2
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    # data.shape = (h*w,2)
+    ret, label, center = cv2.kmeans(np.array(data), k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
+    center = np.uint8(center)  # 返回两种分类群的中心
+    mean = int(np.mean(center))  # 最能区分两个分类群的灰度值
+    result = np.uint8(label*255).reshape(img_shape[:2])  # 重构图像
+    if cfg["debug"]:
+        cv2.imwrite(os.path.join(cfg["to_path"], "2_LazyRed.jpg"), result)
+    return result
+
 
 def enlarge_img(img, top=0.5, bottom=0.5, left=0.5, right=0.5):
     # 边界+50%，防止旋转时使目标溢出边界，特别是旋转椭圆
