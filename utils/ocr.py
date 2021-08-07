@@ -19,6 +19,7 @@ not_en_nor_num = re.compile(r"[^a-zA-Z0-9]", re.I)  # 非英文数字
 
 
 def circle_ocr(img_, img_bw, cfg):
+
     # 1. 识别旋转汉字、定位=================================================
     img2 = circle_to_rectangle(img_)  # 拉直
     img2 = np.concatenate((img2, img2), axis=1)  # 横向拼接截断文本
@@ -56,20 +57,20 @@ def circle_ocr(img_, img_bw, cfg):
                     cfg=cfg)
 
     if not cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_2.jpg"), img2)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_3.jpg"), img3)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_4.jpg"), img4)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_1.json"), mode="w",
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.jpg"), img3)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_4.jpg"), img4)
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res1, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_2.json"), mode="w",
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res2, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_3.json"), mode="w",
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res3, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_3.json"), mode="w",
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res4, f, ensure_ascii=False)
     if cfg["debug"]:
@@ -83,7 +84,7 @@ def circle_ocr(img_, img_bw, cfg):
 
 def cal_angle(res, img2, cfg):
     if len(res) == 0:
-        print(cfg["id"] + " no word")
+        print(cfg["file_name"] + " no word")
         return 0  # 无检测文字
 
     long_side = img2.shape[1]
@@ -122,12 +123,12 @@ def ellipse_ocr(img_, img_bw, cfg):
                     cfg=cfg)
 
     if not cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["id"] + "_2.jpg"), img2)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_1.json"), mode="w",
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res1, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["id"] + "_2.json"), mode="w",
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
                   encoding="utf-8") as f:
             json.dump(res2, f, ensure_ascii=False)
     if cfg["debug"]:
