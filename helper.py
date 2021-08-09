@@ -1,6 +1,8 @@
 # -- coding: utf-8 --
 import json
 
+import requests
+
 
 def cal_pre_rec():
     cls = "rectangle"
@@ -62,6 +64,15 @@ def read_json(path):
 def write_json(content, path):
     with open(path, mode="w", encoding="utf-8") as f:
         json.dump(content, f, ensure_ascii=False)
+
+
+def make_post(url="http://47.101.136.120:9052/uploader",
+              file="validation/origin/rectangle/4101035072404.jpg"):
+    r = requests.post(url=url,
+                      files={"file": open(file, "rb")})
+    result = r.json()
+    print(result)
+    return result
 
 
 if __name__ == '__main__':

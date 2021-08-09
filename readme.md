@@ -7,4 +7,11 @@ graph TB
 	印章分类-->椭圆形印章检测
 ```
 
-flask run -p 8000
+```bash
+# window
+set FLASK_APP=API.py
+# linux
+export FLASK_APP=API.py
+
+flask run -h 0.0.0.0 -p 8000
+```
