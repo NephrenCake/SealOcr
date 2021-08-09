@@ -7,3 +7,4 @@ graph TB
 	印章分类-->椭圆形印章检测
 ```
 
+flask run -p 8000
