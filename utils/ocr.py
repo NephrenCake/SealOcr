@@ -13,6 +13,9 @@ import requests
 en_or_num = re.compile(r"[a-zA-Z0-9]", re.I)  # [a-z]|\d
 not_en_nor_num = re.compile(r"[^a-zA-Z0-9]", re.I)  # 非英文数字
 RESIZE_LENGTH = 1280
+MAIN_PORT = 8866
+RECT_PORT = 8867
+LOCAL_HOST = True
 
 
 def padding_and_resize(img_, resize=RESIZE_LENGTH):
@@ -169,7 +172,7 @@ def rectangle_ocr(img, cfg):
         img2 = img_set[0]
 
     # 2. 识别方章单字
-    res2 = ocr_request(img2, cfg=cfg, port=9052)  # 使用方章专属检测模型接口
+    res2 = ocr_request(img2, cfg=cfg, port=RECT_PORT)  # 使用方章专属检测模型接口
     # 顺序拼接文本
     pic_center_x, pic_center_y = img2.shape[0] / 2, img2.shape[1] / 2
     cn_list = ["", "", "", ""]
@@ -294,7 +297,7 @@ def circle_to_rectangle(cir_img, start=0):
 
 def ocr_request(img, cfg,
                 url="47.101.136.120",
-                port=9053,
+                port=MAIN_PORT,
                 mode="ocr_system"):
     """
     return [{
@@ -308,6 +311,8 @@ def ocr_request(img, cfg,
         data = cv2.imencode('.jpg', image)[1]
         return base64.b64encode(data.tostring()).decode('utf8')
 
+    if LOCAL_HOST:
+        url = "127.0.0.1"  # 使用相同容器下的网络
     # 发送HTTP请求
     r = requests.post(url=f"http://{url}:{port}/predict/{mode}",
                       data=json.dumps({'images': [cv2_to_base64(img)]}),
