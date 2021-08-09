@@ -4,7 +4,8 @@ import json
 
 def cal_pre_rec():
     cls = "rectangle"
-    pre: dict = read_json(f"validation/rotate_cut/{cls}/text_result.json")
+    # pre: dict = read_json(f"validation/rotate_cut/{cls}/text_result.json")
+    pre: dict = read_json(f"text_result.json")
     lab: dict = read_json(f"validation/rotate_cut/{cls}/text_label.json")
 
     total_lab = 0

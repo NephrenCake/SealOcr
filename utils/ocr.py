@@ -1,6 +1,7 @@
 # -- coding: utf-8 --
 import base64
 import json
+import logging
 import os
 import re
 
@@ -9,85 +10,79 @@ import math
 import cv2
 import requests
 
-# img2 = np.rot90(np.rot90(img2))
-# cv2.imshow("img3", img1)
-# cv2.waitKey(0)
-from utils.CubeOCR import OCR
-
 en_or_num = re.compile(r"[a-zA-Z0-9]", re.I)  # [a-z]|\d
 not_en_nor_num = re.compile(r"[^a-zA-Z0-9]", re.I)  # 非英文数字
+RESIZE_LENGTH = 1280
 
 
-def circle_ocr(img_, img_bw, cfg):
+def padding_and_resize(img_, resize=RESIZE_LENGTH):
+    """
+    将狭长图片统一处理成1280*1280，以适应ocr
+    在服务端已设置min=1280预处理，此处可以忽略
+    """
+    long_side = max(img_.shape[0], img_.shape[1])
+    img_ = cv2.copyMakeBorder(img_, 0, long_side - img_.shape[0], 0, long_side - img_.shape[1],
+                              cv2.BORDER_CONSTANT, value=[0, 0, 0])  # padding成正方形
+    if resize != 0:
+        img_ = cv2.resize(img_, (resize, resize))  # resize，因为padding过后目标太小
+    return img_
 
+
+def circle_ocr(img_, cfg):
     # 1. 识别旋转汉字、定位=================================================
     img2 = circle_to_rectangle(img_)  # 拉直
     img2 = np.concatenate((img2, img2), axis=1)  # 横向拼接截断文本
     img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
-    img_bw2 = circle_to_rectangle(img_bw)  # 拉直
-    img_bw2 = np.concatenate((img_bw2, img_bw2), axis=1)  # 横向拼接截断文本
-    img_bw2 = img_bw2[:img_bw2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
-    img2 = np.concatenate((img2, img_bw2), axis=0)  # 同时预测彩色和黑白
-    res2 = rm_words(ocr_request(img2, cfg=cfg),
-                    cfg=cfg)
+    img2 = padding_and_resize(img2)
+    res2 = rm_words(ocr_request(img2, cfg=cfg), cfg=cfg)
 
     angle = cal_angle(res2, img2, cfg=cfg)
     # 2. 识别印章大类=================================================
     center = img_.shape[0] // 2
     mat_rotate = cv2.getRotationMatrix2D((center, center), angle, 1)  # 仿射矩阵
     img1 = cv2.warpAffine(img_, mat_rotate, (img_.shape[0], img_.shape[0]))
-    res1 = rm_words(ocr_request(img1, cfg=cfg),
-                    cfg=cfg)
+    res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
 
-    if len(res1) != 0:  # 消去五大章字样
-        for item in res1:
-            if item["text"].endswith("章"):
-                img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
-                break
-    # 3. 识别下方数字=================================================
-    img3 = circle_to_rectangle(img1, start=60)  # 拉直
-    img3 = img3[:img3.shape[0] // 2, :img3.shape[1] // 3]  # 只检测边缘1/2和下1/3
-    img3 = np.rot90(np.rot90(img3))  # 转正数字
-    res3 = rm_words(ocr_request(img3, cfg=cfg),
-                    cfg=cfg)
-    # 4. 再次校准旋转汉字=================================================
-    img4 = circle_to_rectangle(img1)  # 拉直
-    img4 = img4[:img4.shape[0] // 3 * 2, :]  # 只检测边缘2/3
-    res4 = rm_words(ocr_request(img4, cfg=cfg),
-                    cfg=cfg)
+    # if len(res1) != 0:  # 消去五大章字样
+    #     for item in res1:
+    #         if item["text"].endswith("章"):
+    #             img1 = cv2.fillPoly(img1, (np.array([item["text_region"]]) - 10).astype(np.int32), (255, 255, 255))
+    #             break
+    # # 3. 识别下方数字=================================================
+    # img3 = circle_to_rectangle(img1, start=60)  # 拉直
+    # img3 = img3[:img3.shape[0] // 2, :img3.shape[1] // 3]  # 只检测边缘1/2和下1/3
+    # img3 = np.rot90(np.rot90(img3))  # 转正数字
+    # img3 = padding_and_resize(img3)
+    # res3 = rm_words(ocr_request(img3, cfg=cfg), cfg=cfg)
 
     if not cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.jpg"), img3)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_4.jpg"), img4)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res1, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res2, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res3, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res4, f, ensure_ascii=False)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.jpg"), img3)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res1, f, ensure_ascii=False)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res2, f, ensure_ascii=False)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res3, f, ensure_ascii=False)
+        pass
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_0.jpg"), img_)
+        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_0.jpg"), img_)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_3.jpg"), img3)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_4.jpg"), img4)
-    return rm_words(res1 + res2 + res3 + res4, cfg=cfg)
+        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_3.jpg"), img3)
+    return rm_words(res1 + res2, cfg=cfg)
 
 
-def cal_angle(res, img2, cfg):
+def cal_angle(res, img_, cfg):
     if len(res) == 0:
-        print(cfg["file_name"] + " no word")
+        logging.warning(cfg["file_name"] + " no word!")
         return 0  # 无检测文字
 
-    long_side = img2.shape[1]
+    long_side = img_.shape[1]
     pos = (res[-1]["text_region"][0][0] + res[-1]["text_region"][1][0]) // 2  # 已经按照文本长度升序排列
     rate = (pos - long_side / 2) / (long_side / 2)
     angle = 360 * rate if len(not_en_nor_num.findall(res[-1]["text"])) < len(en_or_num.findall(res[-1]["text"])) else \
@@ -98,59 +93,115 @@ def cal_angle(res, img2, cfg):
     return angle
 
 
-def ellipse_ocr(img_, img_bw, cfg):
-    # 1. 转正，检测中间字符
+def ellipse_ocr(img_, cfg):
     img1 = img_.copy() if img_.shape[0] < img_.shape[1] else np.rot90(img_.copy())
 
-    res1 = rm_words(ocr_request(img1, cfg=cfg),
-                    cfg=cfg)
+    # 1. 转正，检测中间字符
+    res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
 
-    if len(res1) != 0:
-        for item in res1:
-            if item["text"].endswith("章"):
-                try:
-                    img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
-                except:
-                    img1 = img1.copy()
-                    img1 = cv2.fillPoly(img1, np.int32([item["text_region"]]), (255, 255, 255))
-                break
     # 2. 展平 + 拼接
     img2 = circle_to_rectangle(img1)
     img2 = np.concatenate((img2, img2), axis=1)  # 横向拼接截断文本
     img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
-
-    res2 = rm_words(ocr_request(img2, cfg=cfg),
-                    cfg=cfg)
+    img2 = padding_and_resize(img2)
+    res2 = rm_words(ocr_request(img2, cfg=cfg), cfg=cfg)
 
     if not cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res1, f, ensure_ascii=False)
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
-                  encoding="utf-8") as f:
-            json.dump(res2, f, ensure_ascii=False)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res1, f, ensure_ascii=False)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
+        #           encoding="utf-8") as f:
+        #     json.dump(res2, f, ensure_ascii=False)
+        pass
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
     return rm_words(res1 + res2, cfg=cfg)
 
 
-def rectangle_ocr(img, img_bw, cfg):
-    # 1. 确定90°旋转次数
-    # img_r0 = img.copy()
-    # img_r1 = np.rot90(img_r0)
-    # img_r2 = np.rot90(img_r1)
-    # img_r3 = np.rot90(img_r2)
-    #
-    # img2 = img2[:img2.shape[0] // 4, :]
-    # img_1 = np.concatenate((
-    #     img_r0[:img_r0.shape[0] // 3 * 2, :]
-    # ), axis=0)
+def rectangle_ocr(img, cfg):
+    # 1. 识别数字，并确定90°旋转次数。注意rot90是逆时针旋转
+    img_set = {0: img.copy()}
+    img_set[1] = np.rot90(img_set[0])
+    img_set[2] = np.rot90(img_set[1])
+    img_set[3] = np.rot90(img_set[2])
 
-    word, num, = OCR(img)
-    return [word, num]
+    # 取四个方向的底部1/3，纵向拼接
+    img_1 = np.concatenate((img_set[0][img_set[0].shape[0] // 3 * 2:, :], img_set[2][img_set[2].shape[0] // 3 * 2:, :]),
+                           axis=0)
+    img_2 = np.concatenate((img_set[1][img_set[1].shape[0] // 3 * 2:, :], img_set[3][img_set[3].shape[0] // 3 * 2:, :]),
+                           axis=0)
+    if img_1.shape[1] > img_2.shape[1]:
+        img_2 = cv2.copyMakeBorder(img_2, 0, 0, 0, img_1.shape[1] - img_2.shape[1],
+                                   cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    elif img_1.shape[1] < img_2.shape[1]:
+        img_1 = cv2.copyMakeBorder(img_1, 0, 0, 0, img_2.shape[1] - img_1.shape[1],
+                                   cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    img1 = np.concatenate((img_1, img_2), axis=0)  # 保证width相同后才能拼接
+    resize_rate = RESIZE_LENGTH / img1.shape[0]  # 要在预处理之前获取缩放比例
+    img1 = padding_and_resize(img1)  # ocr预处理
+    res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
+
+    # 获取第二次ocr图
+    if len(res1) != 0:
+        # 纠正角度并倒推缩放前的数字框
+        p1, p2, p3, p4 = (np.array(res1[-1]["text_region"]) / resize_rate).tolist()
+        height = (p1[1] + p2[1] + p3[1] + p4[1]) / 4
+        if height > img.shape[0] // 3 * 2 + img.shape[1] // 3:
+            pos, bias = 3, (img.shape[1] // 3 * 2) - (img.shape[0] // 3 * 2 + img.shape[1] // 3)
+        elif height > img.shape[0] // 3 * 2:
+            pos, bias = 1, (img.shape[1] // 3 * 2) - (img.shape[0] // 3 * 2)
+        elif height > img.shape[0] // 3:
+            pos, bias = 2, (img.shape[0] // 3 * 2) - (img.shape[0] // 3)
+        else:
+            pos, bias = 0, (img.shape[0] // 3 * 2)
+        p1[1], p2[1], p3[1], p4[1] = p1[1] + bias, p2[1] + bias, p3[1] + bias, p4[1] + bias
+        # 1. error: (-215:Assertion failed) p.checkVector(2, 4) >= 0 in function 'cv::fillPoly'
+        # 2. TypeError: Layout of the output array img is incompatible with cv::Mat
+        #    (step[ndims-1] != elemsize or step[1] != elemsize*nchannels)
+        img2 = cv2.fillPoly(img_set[pos].copy().astype(np.uint8),
+                            np.array([[p1, p2, p3, p4]]).astype(np.int32), (255, 255, 255))
+    else:
+        logging.warning(cfg["file_name"] + " no num!")
+        img2 = img_set[0]
+
+    # 2. 识别方章单字
+    res2 = ocr_request(img2, cfg=cfg, port=9052)  # 使用方章专属检测模型接口
+    # 顺序拼接文本
+    pic_center_x, pic_center_y = img2.shape[0] / 2, img2.shape[1] / 2
+    cn_list = ["", "", "", ""]
+    for item in res2:
+        x, y = get_center(item)
+        if x > pic_center_x and y < pic_center_y:
+            cn_list[0] = item["text"]
+        elif x > pic_center_x and y > pic_center_y:
+            cn_list[1] = item["text"]
+        elif x < pic_center_x and y < pic_center_y:
+            cn_list[2] = item["text"]
+        else:
+            cn_list[3] = item["text"]
+    cn_text = ""
+    for word in cn_list:
+        cn_text = cn_text + word
+
+    if cfg["debug"]:
+        cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
+        pass
+    if not cfg["debug"]:
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+    return res1 + [{"text": cn_text}]
+
+
+def get_center(item):
+    p1, p2, p3, p4 = item["text_region"]
+    item_center_y = (p1[1] + p2[1] + p3[1] + p4[1]) / 4
+    item_center_x = (p1[0] + p2[0] + p3[0] + p4[0]) / 4
+    return item_center_x, item_center_y
 
 
 def rm_words(res, cfg):
@@ -169,6 +220,7 @@ def rm_words(res, cfg):
 
     # 2. 去除中文文本中的数字和英文，以及去除英文数字文本中的中文
     # 这是有必要的，因为有可能会出现"郑91410182MA9FNWR87J回", 甚至"郑""回"是横着的
+    # 当前版本没有上述情况，但为了防止意外。提升速度时可以删去
     for idx in range(len(res)):
         txt = res[idx]["text"]
         l_n = en_or_num.findall(txt)
@@ -240,15 +292,16 @@ def circle_to_rectangle(cir_img, start=0):
     return rect_img
 
 
-def ocr_request(img, cfg):
+def ocr_request(img, cfg,
+                url="47.101.136.120",
+                port=9053,
+                mode="ocr_system"):
     """
     return [{
-                "angle": 0 / 180,
-                "angle_conf": 0 - 1,
-                "confidence": 0 - 1,
-                "text": str,
-                "text_region": [[x, y] * 4]
-            } * n ]
+        "confidence": 0 - 1,
+        "text": str,
+        "text_region": [[x, y] * 4]
+    } * n ]
     """
 
     def cv2_to_base64(image):
@@ -256,7 +309,7 @@ def ocr_request(img, cfg):
         return base64.b64encode(data.tostring()).decode('utf8')
 
     # 发送HTTP请求
-    r = requests.post(url="http://47.101.136.120:8866/predict/ocr_system",
+    r = requests.post(url=f"http://{url}:{port}/predict/{mode}",
                       data=json.dumps({'images': [cv2_to_base64(img)]}),
                       headers={"Content-type": "application/json"})
     result = (r.json())["results"][0]
@@ -266,5 +319,5 @@ def ocr_request(img, cfg):
     return result
 
 
-def plot_ocr(img):
+def plot_ocr(img, result):
     pass

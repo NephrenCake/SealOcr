@@ -22,42 +22,48 @@ def Lazyfilter(img, cfg):
 
 
 def work(cfg):
+    t0 = time.time()
+    # 分类
     category, img = model.predict(cfg['img_path'])
     img = enlarge_img(img)
     img_ = img.copy()
-    t0 = time.time()
-
+    # 提取红色
+    t1 = time.time()
     img_, img_bw = Lazyfilter(img_, cfg)
-    t2 = time.time()
     # 开运算去噪填充
+    t2 = time.time()
     img_ = erode_dilate(img_, category, cfg=cfg)
-    t3 = time.time()
     # 查找最大轮廓
+    t3 = time.time()
     contours, max_idx = find_max(img_)
-    t4 = time.time()
     # 完成检测框
+    t4 = time.time()
     det = get_area(img, contours, max_idx, category, cfg=cfg)  # 不进行分类
-    t5 = time.time()
     # 截取目标区域  img:原图 img_bw:二值
+    t5 = time.time()
     img = rotate_cut(img, det, cfg=cfg)
-    img_bw = rotate_cut(img_bw, det, cfg=cfg)
-    t6 = time.time()
     # ============分类处理目标区域
+    t6 = time.time()
+    result = []
     if category == '圆形':
-        res = circle_ocr(img, img_bw, cfg=cfg)  # 使用二值图预测
+        res = circle_ocr(img, cfg=cfg)  # 使用二值图预测
     elif category == "正方形":
-        res = rectangle_ocr(img, img_bw, cfg=cfg)
+        res = rectangle_ocr(img, cfg=cfg)
     else:
-        res = ellipse_ocr(img, img_bw, cfg=cfg)
+        res = ellipse_ocr(img, cfg=cfg)
+    # 提取文本信息
+    for item in res:
+        result.append(item["text"])
+    result_string = json.dumps(result, ensure_ascii=False)
+    if not cfg["debug"]:
+        with open(os.path.join(cfg["to_path"], cfg["file_name"] + ".json"), mode="w", encoding="utf-8") as f:
+            json.dump(res, f, ensure_ascii=False)
     t7 = time.time()
-    detail = f"{cfg['file_name']} done " \
-             f"kmeans+redfilter:{round(t2 - t0, 2)}+" \
-             f"fit:{round(t5 - t4, 2)}+" \
-             f"ocr:{round(t7 - t6, 2)}=" \
-             f"total{round(t7 - t0, 2)}s. " \
-             f"class={det['class']}"
+
+    detail = f"{cfg['file_name']} done in {round(t7 - t0, 2)}s. " \
+             f"class={det['class']}, text={result_string}"
     logging.info(detail)
-    return category, res
+    return result_string
 
 
 def one_pic(file_, to_path_, opt_):
@@ -73,11 +79,7 @@ def one_pic(file_, to_path_, opt_):
         "to_path": to_path_,
         "debug": opt_["debug"]
     }
-
-    cls, res = work(cfg)
-    if not opt_["debug"]:
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + ".json"), mode="w", encoding="utf-8") as f:
-            json.dump(res, f, ensure_ascii=False)
+    res = work(cfg)
     return res
 
 
@@ -92,7 +94,7 @@ def main(opt):
         for t in t_l:
             if t.endswith(".jpg") or t.endswith(".png") or t.endswith(".bmp"):
                 file_list.append(os.path.join(opt["source"], t))
-    print(f"{len(file_list)} images found.")
+    logging.info(f"{len(file_list)} images found.")
 
     # 检查输出文件夹
     to_path = None
@@ -106,28 +108,20 @@ def main(opt):
         if not os.path.exists(to_path):
             os.mkdir(to_path)
 
-    LOG_FORMAT = "[%(asctime)s] %(levelname)s : %(message)s"
-    logging.basicConfig(filename=f"{time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}.log",
-                        level=logging.INFO,
-                        format=LOG_FORMAT)
-
-    text = ""
+    res = json.dumps([], ensure_ascii=False)
     for file in file_list:
-        text = one_pic(file_=file, to_path_=to_path, opt_=opt)
-        '''
+        # res = one_pic(file_=file, to_path_=to_path, opt_=opt)
         try:
-           text = one_pic(file_=file, to_path_=to_path, opt_=opt)
+           res = one_pic(file_=file, to_path_=to_path, opt_=opt)
         except Exception:
            logging.error(f"error occurred in {file}")
-        '''
-    logging.info(f"all completed {time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())}")
-    return json.dumps(text, ensure_ascii=False)
+    return res
 
 
 if __name__ == '__main__':
     # 参数设置
     opt = {
-        "source": r'C:/Users/a8275/Desktop/project/dataset/4101035073190.jpg',
+        "source": r'validation/origin/rectangle/4101035072803.jpg',
         "debug": False  # debug模式将可视化各环节，否则只输出结果
     }
     print(main(opt))

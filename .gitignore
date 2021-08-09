@@ -220,6 +220,7 @@ debug/
 run/
 seal_source/
 test_source/
+train/
 test.py
 test1.py
 test2.py

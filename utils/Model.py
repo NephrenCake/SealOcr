@@ -27,7 +27,7 @@ class Model():
             model.load_state_dict(torch.load(Dict))
         else :
             model.load_state_dict(torch.load(Dict, map_location=torch.device('cpu')))
-        print("Model loaded!")
+        # print("Model loaded!")
         self.model = model
     def Device(self):
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -36,7 +36,7 @@ class Model():
         Tensor,img = self.__img2tensor(ImgPath)
         pred = self.model(Tensor)
         result = self.__arg2label(pred.argmax())
-        print(result)
+        # print(result)
         return result,img
     def __img2tensor(self,ImgPath):
         OImg = cv2.imread(ImgPath) #origin图片
