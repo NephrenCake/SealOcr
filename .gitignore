@@ -235,3 +235,5 @@ upload/
 
 #
 
+/validation/
+/text_result.json
