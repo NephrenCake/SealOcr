@@ -54,7 +54,7 @@ def get_result(res, category):
                     # 设定type
                     if item not in seal_type.keys():
                         result["SealType"] = "99"
-                        result["strSealType"] = "其他类型印章"  # 可以变换成item
+                        result["strSealType"] = item  # "其他类型印章"
                     else:
                         result["SealType"] = seal_type[item]
                         result["strSealType"] = item
