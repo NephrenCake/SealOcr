@@ -6,6 +6,19 @@ import cv2
 import json
 
 
+def Precisefilter(img, cfg):
+    img_ = filter_non_red(img, cfg=cfg)
+    img_ = k_means(img_, cfg=cfg)
+    img_bw = cv2.merge([img_, img_, img_])
+    return img_, img_bw
+
+
+def Lazyfilter(img, cfg):
+    img_ = Differ_kmeans(img, cfg)
+    img_bw = cv2.merge([img_, img_, img_])
+    return img_, img_bw
+
+
 def Differ_kmeans(img, cfg):
     """
     根据差值进行分类

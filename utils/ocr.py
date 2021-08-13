@@ -46,31 +46,9 @@ def circle_ocr(img_, cfg):
     img1 = cv2.warpAffine(img_, mat_rotate, (img_.shape[0], img_.shape[0]))
     res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
 
-    # if len(res1) != 0:  # 消去五大章字样
-    #     for item in res1:
-    #         if item["text"].endswith("章"):
-    #             img1 = cv2.fillPoly(img1, (np.array([item["text_region"]]) - 10).astype(np.int32), (255, 255, 255))
-    #             break
-    # # 3. 识别下方数字=================================================
-    # img3 = circle_to_rectangle(img1, start=60)  # 拉直
-    # img3 = img3[:img3.shape[0] // 2, :img3.shape[1] // 3]  # 只检测边缘1/2和下1/3
-    # img3 = np.rot90(np.rot90(img3))  # 转正数字
-    # img3 = padding_and_resize(img3)
-    # res3 = rm_words(ocr_request(img3, cfg=cfg), cfg=cfg)
-
     if not cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
-        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.jpg"), img3)
-        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
-        #           encoding="utf-8") as f:
-        #     json.dump(res1, f, ensure_ascii=False)
-        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
-        #           encoding="utf-8") as f:
-        #     json.dump(res2, f, ensure_ascii=False)
-        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_3.json"), mode="w",
-        #           encoding="utf-8") as f:
-        #     json.dump(res3, f, ensure_ascii=False)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
         pass
     if cfg["debug"]:
         # cv2.imwrite(os.path.join(cfg["to_path"], "trans_0.jpg"), img_)
@@ -110,14 +88,8 @@ def ellipse_ocr(img_, cfg):
     res2 = rm_words(ocr_request(img2, cfg=cfg), cfg=cfg)
 
     if not cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
-        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.json"), mode="w",
-        #           encoding="utf-8") as f:
-        #     json.dump(res1, f, ensure_ascii=False)
-        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.json"), mode="w",
-        #           encoding="utf-8") as f:
-        #     json.dump(res2, f, ensure_ascii=False)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
         pass
     if cfg["debug"]:
         cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
@@ -191,12 +163,13 @@ def rectangle_ocr(img, cfg):
         cn_text = cn_text + word
 
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
+        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
+        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
         pass
     if not cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+        pass
     return res1 + [{"text": cn_text}]
 
 
