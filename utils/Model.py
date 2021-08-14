@@ -34,7 +34,8 @@ class Model():
         return device
     def predict(self,ImgPath):
         Tensor,img = self.__img2tensor(ImgPath)
-        pred = self.model(Tensor)
+        with torch.no_grad():
+            pred = self.model(Tensor)
         result = self.__arg2label(pred.argmax())
         # print(result)
         return result,img
