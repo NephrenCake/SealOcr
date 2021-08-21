@@ -10,57 +10,96 @@ import logging
 
 model = Model(0)
 
+CODE_SCORE = 0  # 0.98 0.97
+NAME_SCORE = 0  # 0.9
+
 
 def get_result(res, category):
     en_or_num = re.compile(r"[a-zA-Z0-9]", re.I)  # [a-z]|\d
     not_en_nor_num = re.compile(r"[^a-zA-Z0-9]", re.I)  # 非英文数字
 
+    null_text = {"text": "", "confidence": 0}
     result = {
-        "code": "",  # 印章编号
-        "name": "",  # 印章名称
-        "SealType": "",  # 印章类型代码
-        "strSealType": ""  # 印章类型名称
+        "code": null_text,  # 印章编号
+        "name": null_text,  # 印章名称
+        "SealType": "99",  # 印章类型代码
+        "strSealType": "其他类型印章"  # 印章类型名称
     }
     seal_type = {
-        "法定名称章": "01",
+        # "法定名称章": "01",
         "财务专用章": "02",
-        "发票专用章": "03",
+        # "发票专用章": "03",
         "合同专用章": "04",
-        "法定代表人名章": "05",
+        # "法定代表人名章": "05",
         "其他类型印章": "99"
     }
 
+    logging.info(f"<{[str(item['text']) + '|' + str(item['confidence']) for item in res]}>")
+
     if category == "正方形":
-        result["code"] = res[0]
-        result["name"] = res[1]
         result["SealType"] = "05"
         result["strSealType"] = "法定代表人名章"
+        result["code"] = {
+            "text": res[0]["text"], "confidence": res[0]["confidence"]
+        } if res[0]["confidence"] >= CODE_SCORE else null_text  # 设定编号
+        result["name"] = {
+            "text": res[1]["text"], "confidence": res[1]["confidence"]
+        } if res[1]["confidence"] >= NAME_SCORE else null_text  # 设定name
+    elif category == "椭圆":  # todo 调参
+        result["SealType"] = "03"
+        result["strSealType"] = "发票专用章"
+        for item in res:
+            text = item["text"]
+            score = item["confidence"]
+            from_ = item["from"]
+            if len(en_or_num.findall(text)) > len(not_en_nor_num.findall(text)):
+                result["code"] = {
+                    "text": text, "confidence": score
+                } if score >= CODE_SCORE and from_ == "center" else null_text  # 设定编号
+            else:
+                result["name"] = {
+                    "text": text, "confidence": score
+                } if score >= NAME_SCORE and from_ == "side" else null_text  # 设定name
     elif len(res) == 2:
         result["SealType"] = "01"
         result["strSealType"] = "法定名称章"
         for item in res:
-            if len(en_or_num.findall(item)) > len(not_en_nor_num.findall(item)):
-                result["code"] = item
+            text = item["text"]
+            score = item["confidence"]
+            from_ = item["from"]
+            if len(en_or_num.findall(text)) > len(not_en_nor_num.findall(text)):
+                result["code"] = {
+                    "text": text, "confidence": score
+                } if score >= CODE_SCORE and from_ == "side" else null_text  # 设定编号
             else:
-                result["name"] = item
+                result["name"] = {
+                    "text": text, "confidence": score
+                } if score >= NAME_SCORE and from_ == "side" else null_text  # 设定name
     else:
-        cn_count = 0
+        set_type = True
         for item in res:
-            if len(en_or_num.findall(item)) > len(not_en_nor_num.findall(item)):
-                result["code"] = item
+            text = item["text"]
+            score = item["confidence"]
+            from_ = item["from"]
+            if len(en_or_num.findall(text)) > len(not_en_nor_num.findall(text)):
+                result["code"] = {
+                    "text": text, "confidence": score
+                } if score >= CODE_SCORE and from_ == "side" else null_text  # 设定编号
             else:
-                cn_count += 1
-                if cn_count == 1:
+                if set_type:
                     # 设定type
-                    if item not in seal_type.keys():
+                    if text not in seal_type.keys():
                         result["SealType"] = "99"
-                        result["strSealType"] = item  # "其他类型印章"
+                        result["strSealType"] = "其他类型印章"  # "其他类型印章"
                     else:
-                        result["SealType"] = seal_type[item]
-                        result["strSealType"] = item
+                        result["SealType"] = seal_type[text]
+                        result["strSealType"] = text
+                    set_type = False
                 else:
                     # 设定name
-                    result["name"] = item
+                    result["name"] = {
+                        "text": text, "confidence": score
+                    } if score >= NAME_SCORE and from_ == "side" else null_text  # 设定name
     return result
 
 
@@ -94,12 +133,8 @@ def work(cfg):
     else:
         res = ellipse_ocr(img, cfg=cfg)
 
-    result = []
-    # 提取文本信息
-    for item in res:
-        result.append(item["text"])
     # 将文本列表处理成标准json格式
-    result = get_result(result, category)
+    result = get_result(res, category)
 
     result_string = json.dumps(result, ensure_ascii=False)
     if not cfg["debug"]:
@@ -162,7 +197,8 @@ def main(opt):
             res = one_pic(file_=file, to_path_=to_path, opt_=opt)
         except Exception as e:
             logging.error(f"error occurred in {file}: {e}\n"
-                          f"{traceback.print_exc()}")
+                          f"{traceback.format_exc()}")
+            traceback.print_exc()
     return res
 
 

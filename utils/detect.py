@@ -38,7 +38,8 @@ def Differ_kmeans(img, cfg):
             for j in range(result.shape[1]):
                 result[i, j] = 255 - result[i, j]
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "2_LazyRed.jpg"), result)
+        pass
+        # cv2.imwrite(os.path.join(cfg["to_path"], "2_LazyRed.jpg"), result)
     return result
 
 
@@ -160,7 +161,8 @@ def erode_dilate(img, category, cfg):
     #     img_ = cv2.dilate(img_, kernel, iterations=3)  # 填充边缘
 
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "4_open.jpg"), img_)
+        pass
+        # cv2.imwrite(os.path.join(cfg["to_path"], "4_open.jpg"), img_)
     return img_
 
 
@@ -333,5 +335,6 @@ def rotate_cut(img, det, cfg):
     # img_ = np.rot90(img_)  # 可选的90°旋转
 
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "6_cut.jpg"), img_)
+        pass
+        # cv2.imwrite(os.path.join(cfg["to_path"], "6_cut.jpg"), img_)
     return img_

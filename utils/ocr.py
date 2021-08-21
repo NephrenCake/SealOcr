@@ -38,6 +38,8 @@ def circle_ocr(img_, cfg):
     img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
     img2 = padding_and_resize(img2)
     res2 = rm_words(ocr_request(img2, cfg=cfg), cfg=cfg)
+    for item in res2:
+        item["from"] = "side"
 
     angle = cal_angle(res2, img2, cfg=cfg)
     # 2. 识别印章大类=================================================
@@ -45,6 +47,8 @@ def circle_ocr(img_, cfg):
     mat_rotate = cv2.getRotationMatrix2D((center, center), angle, 1)  # 仿射矩阵
     img1 = cv2.warpAffine(img_, mat_rotate, (img_.shape[0], img_.shape[0]))
     res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
+    for item in res1:
+        item["from"] = "center"
 
     if not cfg["debug"]:
         # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
@@ -52,8 +56,8 @@ def circle_ocr(img_, cfg):
         pass
     if cfg["debug"]:
         # cv2.imwrite(os.path.join(cfg["to_path"], "trans_0.jpg"), img_)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
         # cv2.imwrite(os.path.join(cfg["to_path"], "trans_3.jpg"), img3)
     return rm_words(res1 + res2, cfg=cfg)
 
@@ -79,6 +83,8 @@ def ellipse_ocr(img_, cfg):
 
     # 1. 转正，检测中间字符
     res1 = rm_words(ocr_request(img1, cfg=cfg), cfg=cfg)
+    for item in res1:
+        item["from"] = "center"
 
     # 2. 展平 + 拼接
     img2 = circle_to_rectangle(img1)
@@ -86,14 +92,16 @@ def ellipse_ocr(img_, cfg):
     img2 = img2[:img2.shape[0] // 3 * 2, :]  # 只检测边缘2/3
     img2 = padding_and_resize(img2)
     res2 = rm_words(ocr_request(img2, cfg=cfg), cfg=cfg)
+    for item in res2:
+        item["from"] = "side"
 
     if not cfg["debug"]:
         # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
         # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
         pass
     if cfg["debug"]:
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
-        cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
     return rm_words(res1 + res2, cfg=cfg)
 
 
@@ -141,15 +149,23 @@ def rectangle_ocr(img, cfg):
                             np.array([[p1, p2, p3, p4]]).astype(np.int32), (255, 255, 255))
     else:
         logging.warning(cfg["file_name"] + " no num!")
+        res1 = [{"text": "", "confidence": 0}]
         img2 = img_set[0]
 
     # 2. 识别方章单字
     res2 = ocr_request(img2, cfg=cfg, port=RECT_PORT)  # 使用方章专属检测模型接口
+
     # 顺序拼接文本
     pic_center_x, pic_center_y = img2.shape[0] / 2, img2.shape[1] / 2
     cn_list = ["", "", "", ""]
+    score = 0
+    length = 0
     for item in res2:
         x, y = get_center(item)
+        if len(en_or_num.findall(item["text"])) != 0:  # 识别汉字的时候丢弃所有数字，除非是完整的数字
+            if item["confidence"] > res1[0]["confidence"] and len(item["text"]) == 13:
+                res1 = [item]
+            continue
         if x > pic_center_x and y < pic_center_y:
             cn_list[0] = item["text"]
         elif x > pic_center_x and y > pic_center_y:
@@ -158,19 +174,26 @@ def rectangle_ocr(img, cfg):
             cn_list[2] = item["text"]
         else:
             cn_list[3] = item["text"]
-    cn_text = ""
+        score += item["confidence"]
+        length += 1
+    score = score / length
+    cn_text = ""  # 拼接文本
     for word in cn_list:
         cn_text = cn_text + word
 
-    if cfg["debug"]:
-        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_1.jpg"), img1)
-        # cv2.imwrite(os.path.join(cfg["to_path"], "trans_2.jpg"), img2)
-        pass
+    if cn_list[0] == "" or cn_list[1] == "" or not cn_text.endswith("印"):
+        score = 0  # 缺失文字，直接返回0置信度
+
     if not cfg["debug"]:
         # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
         # cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
         pass
-    return res1 + [{"text": cn_text}]
+    if cfg["debug"]:
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_1.jpg"), img1)
+        cv2.imwrite(os.path.join(cfg["to_path"], cfg["file_name"] + "_2.jpg"), img2)
+        pass
+
+    return [res1[-1]] + [{"text": cn_text, "confidence": score}]
 
 
 def get_center(item):
@@ -190,7 +213,9 @@ def rm_words(res, cfg):
     # 1. 过滤短文本
     save_list = []
     for item in res:
-        if len(item["text"]) >= 5:
+        num_len = len(en_or_num.findall(item["text"]))
+        ch_len = len(not_en_nor_num.findall(item["text"]))
+        if num_len == 13 or num_len == 18 or ch_len >= 5:
             save_list.append(item)
     res = save_list
 
@@ -293,7 +318,8 @@ def ocr_request(img, cfg,
     result = (r.json())["results"][0]
 
     if cfg["debug"]:
-        print(result)
+        # print(result)
+        pass
     return result
 
 
