@@ -1,0 +1,7 @@
+Flask==2.0.1
+numpy==1.19.2
+Werkzeug==2.0.1
+torch==1.9.0+cu111
+opencv_python==4.5.2.54
+requests==2.25.1
+torchvision==0.10.0+cu111

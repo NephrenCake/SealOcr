@@ -86,7 +86,7 @@ def get_result(res, category):
                     "text": text, "confidence": score
                 } if score >= CODE_SCORE and from_ == "side" else null_text  # 设定编号
             else:
-                if set_type:
+                if set_type and from_ == "center":
                     # 设定type
                     if text not in seal_type.keys():
                         result["SealType"] = "99"
@@ -138,8 +138,9 @@ def work(cfg):
 
     result_string = json.dumps(result, ensure_ascii=False)
     if not cfg["debug"]:
-        with open(os.path.join(cfg["to_path"], cfg["file_name"] + ".json"), mode="w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False)
+        # with open(os.path.join(cfg["to_path"], cfg["file_name"] + ".json"), mode="w", encoding="utf-8") as f:
+        #     json.dump(result, f, ensure_ascii=False)
+        pass
     t7 = time.time()
 
     detail = f"{cfg['file_name']} done in {round(t7 - t0, 2)}s. " \
@@ -154,7 +155,6 @@ def one_pic(file_, to_path_, opt_):
         to_path_ = os.path.join("debug", fn.split(".")[0])
         if not os.path.exists(to_path_):
             os.mkdir(to_path_)
-    assert os.path.exists(to_path_)
     cfg = {
         "file_name": fn.split(".")[0],
         "img_path": file_,
@@ -186,9 +186,9 @@ def main(opt):
     else:
         if not os.path.exists("run"):
             os.mkdir("run")
-        to_path = os.path.join("run", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
-        if not os.path.exists(to_path):
-            os.mkdir(to_path)
+        # to_path = os.path.join("run", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
+        # if not os.path.exists(to_path):
+        #     os.mkdir(to_path)
 
     res = json.dumps([], ensure_ascii=False)
     for file in file_list:

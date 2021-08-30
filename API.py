@@ -1,6 +1,7 @@
 # -- coding: utf-8 --
 import logging
 import time
+import uuid
 
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
@@ -33,8 +34,7 @@ logger = get_logger()
 def uploader():
     if request.method == 'POST':
         f = request.files['file']
-        # print(request.files)
-        path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f.filename))
+        path = os.path.join(app.config['UPLOAD_FOLDER'], uuid.uuid1().hex + "." + secure_filename(f.filename)[-3:])
         f.save(path)
         text = main({"source": path, "debug": False})
         if os.path.isfile(path):
