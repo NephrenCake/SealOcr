@@ -1,5 +1,6 @@
 # -- coding: utf-8 --
 import json
+import time
 
 import requests
 
@@ -76,5 +77,15 @@ def make_post(url="http://47.101.136.120:9052/uploader",
 
 
 if __name__ == '__main__':
-    cal_pre_rec()
+    start = time.time()
+    t1 = start
+    for i in range(10):
+        make_post(url="http://47.101.136.120:9052/uploader",
+                  file="validation/origin/rectangle/4101035072404.jpg")
+        end = time.time()
+        cost = end - start
+        print(f"------------{i}: {cost}")
+        start = end
+    t2 = time.time()
+    print((t2 - t1) / 20)
     pass
