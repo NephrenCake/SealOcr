@@ -294,7 +294,7 @@ def circle_to_rectangle(cir_img, start=0):
 
 
 def ocr_request(img, cfg,
-                url="47.101.136.120",
+                url="127.0.0.1",
                 port=MAIN_PORT,
                 mode="ocr_system"):
     """

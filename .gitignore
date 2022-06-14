@@ -215,7 +215,7 @@ fabric.properties
 .idea
 upload/
 
-# 刘亦飞
+#
 debug/
 run/
 seal_source/
@@ -226,8 +226,9 @@ test1.py
 test2.py
 test3.py
 test_post.py
+helper.py
 
-# 张典
+#
 test.py
 testresult
 #
